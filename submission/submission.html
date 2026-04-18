@@ -1,27 +1,29 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
-  <title>Joel</title>
+  <title>Chaos Skip Ad</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <style type="text/css">
+  <style>
     html,
     body {
-      background: transparent;
       margin: 0;
       padding: 0;
+      background: transparent;
       font-family: sans-serif;
     }
 
     #overlay-container {
       width: 960px;
       height: 540px;
+      position: relative;
+      overflow: hidden;
     }
 
-    /* Your style here... (feel free to remove this example styling) */
     #skip {
-      display: none; /* Hidden until ad starts */
+      display: none;
       position: absolute;
       bottom: 60px;
       right: 0;
@@ -33,52 +35,313 @@
       border-radius: 4px 0 0 4px;
       color: white;
       cursor: pointer;
+      z-index: 10;
+    }
+
+    #rain-container {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .falling {
+      position: absolute;
+      animation: fall linear forwards;
+    }
+
+    .falling button {
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    #message {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: white;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 6px 10px;
+      border-radius: 4px;
+      display: none;
+    }
+
+    #verification {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      right: 10px;
+      font-size: 13px;
+      color: #ddd;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 6px 10px;
+      border-radius: 4px;
+      opacity: 0.9;
+    }
+
+    @keyframes fall {
+      0% {
+        transform: translate(0, -50px);
+      }
+
+      50% {
+        transform: translate(30px, 300px);
+      }
+
+      100% {
+        transform: translate(-30px, 600px);
+      }
     }
   </style>
 </head>
 
 <body>
   <div id="overlay-container">
-    <!-- We've added a sample button. Feel free to remove it: -->
-    <button id="skip">
-      Skip Ad...
-    </button>
+    <button id="skip">Skip Ad</button>
+    <div id="rain-container"></div>
+    <div id="message"></div>
+    <div id="verification">(beta test) Waiting to start verification…</div>
   </div>
 
-  <script type="text/javascript">
-    (function(window, document){
-      // This is how you tell the parent window that the ad was successfully skipped.
+  <script>
+    (function () {
+      const rainContainer = document.getElementById('rain-container');
+      const skipButton = document.getElementById('skip');
+      const messageBox = document.getElementById('message');
+      const verificationBox = document.getElementById('verification');
+
+      let rainActive = false;
+      let rainSpeedMultiplier = 1;
+      let canWin = false;
+      let verificationInterval = null;
+      let realButtonUnlocked = false;
+
+      // --- Verification messages ---
+      const verificationMessages = [
+        "(beta test) Verifying you are human…",
+        "(beta test) Checking interaction patterns…",
+        "(beta test) Validating input timing…",
+        "(beta test) Analyzing click behavior…",
+        "(beta test) Confirming manual interaction…",
+        "(beta test) Almost done…"
+      ];
+
+      function startVerificationMessages() {
+        let i = 0;
+        clearInterval(verificationInterval);
+
+        verificationInterval = setInterval(() => {
+          verificationBox.textContent =
+            verificationMessages[i % verificationMessages.length];
+          i++;
+        }, 2000);
+      }
+
+      // --- UI helpers ---
+      function flashMessage(text, duration = 1000) {
+        messageBox.textContent = text;
+        messageBox.style.display = 'block';
+        setTimeout(() => {
+          messageBox.style.display = 'none';
+        }, duration);
+      }
+
       function adSuccess() {
+        stopRain();
         window.top.postMessage({ type: 'success' }, '*');
       }
 
-      const skipButton = document.getElementById('skip');
+      function stopRain() {
+        rainActive = false;
+        rainSpeedMultiplier = 1;
+        rainContainer.innerHTML = "";
+        clearInterval(verificationInterval);
+        verificationBox.textContent = "(beta test) Verification stopped";
+      }
 
-      // Listen for messages from the game shell
+      function resetToSkip() {
+        stopRain();
+        verificationBox.textContent = "(beta test) Verification interrupted…";
+        skipButton.style.display = 'block';
+      }
+
+      function triggerDoNotRedeem() {
+        verificationBox.textContent = "(beta test) DO NOT REDEEM!!!";
+        flashMessage("🚨 DO NOT REDEEM 🚨", 2000);
+      }
+
+      // --- Button creation ---
+      function createFallingButton(type) {
+        const wrapper = document.createElement('div');
+        wrapper.classList.add('falling');
+
+        const btn = document.createElement('button');
+
+        const labels = {
+          real: "Skip Ad",
+          close: "✖ Close",
+          speed: "⏩ 2x",
+          mute: "🔇 Mute",
+          settings: "⚙️ Settings",
+          continue: "Continue",
+          fake: "Skip Add",
+          redeem: "Redeem" // Easter egg
+        };
+
+        btn.textContent = labels[type] || "Continue";
+
+        wrapper.style.left = Math.random() * 90 + '%';
+
+        const duration = (3 + Math.random() * 3) / rainSpeedMultiplier;
+        wrapper.style.animationDuration = duration + 's';
+
+        // subtle cursor dodge
+        btn.addEventListener('mouseenter', () => {
+          btn.style.transform = `translateX(${Math.random() * 20 - 10}px)`;
+        });
+
+        btn.addEventListener('click', () => {
+          switch (type) {
+            case 'real':
+              if (canWin) {
+                verificationBox.textContent = "(beta test) Verification complete";
+                adSuccess();
+              } else {
+                verificationBox.textContent = "(beta test) Verification not ready…";
+              }
+              break;
+
+            case 'close':
+              flashMessage("Closed");
+              verificationBox.textContent = "(beta test) Verification interrupted… restarting";
+              resetToSkip();
+              break;
+
+            case 'speed':
+              rainSpeedMultiplier *= 1.8;
+              verificationBox.textContent = "(beta test) Acceleration detected… verifying";
+              flashMessage("2x speed");
+              break;
+
+            case 'mute':
+              verificationBox.textContent = "(beta test) Audio state irrelevant… continuing";
+              flashMessage("Muted 🔇");
+              break;
+
+            case 'settings':
+              verificationBox.textContent = "(beta test) Settings access restricted…";
+              flashMessage("Opening settings...");
+              spawnSettingsSpam();
+              break;
+
+            case 'continue':
+              rainActive = false;
+              verificationBox.textContent = "(beta test) Processing… please wait";
+              flashMessage("Loading...");
+              setTimeout(() => startChaosRain(), 1500);
+              break;
+
+            case 'redeem':
+              triggerDoNotRedeem();
+              break;
+
+            default:
+              btn.textContent = "❌";
+              btn.style.background = "red";
+              verificationBox.textContent = "(beta test) Invalid input detected…";
+          }
+        });
+
+        wrapper.appendChild(btn);
+        rainContainer.appendChild(wrapper);
+
+        setTimeout(() => wrapper.remove(), duration * 1000);
+      }
+
+      function spawnSettingsSpam() {
+        for (let i = 0; i < 6; i++) {
+          createFallingButton('settings');
+        }
+      }
+
+      function spawnRandomButton() {
+        const types = ['close', 'speed', 'mute', 'settings', 'continue', 'fake', 'fake'];
+
+        // Easter egg 2% spawn chance
+        if (Math.random() < 0.02) {
+          createFallingButton('redeem');
+          return;
+        }
+
+        // Only allow real button after unlock
+        if (realButtonUnlocked && Math.random() < 0.15) {
+          createFallingButton('real');
+        } else {
+          const type = types[Math.floor(Math.random() * types.length)];
+          createFallingButton(type);
+        }
+      }
+
+      // --- Rain loop ---
+      function startChaosRain() {
+        if (rainActive) return;
+        rainActive = true;
+
+        startVerificationMessages();
+
+        canWin = false;
+        realButtonUnlocked = false;
+
+        // delay before it can be clicked
+        setTimeout(() => {
+          canWin = true;
+          verificationBox.textContent = "(beta test) Verification nearly complete…";
+        }, 4000);
+
+        // delay before it can even spawn
+        setTimeout(() => {
+          realButtonUnlocked = true;
+        }, 3000);
+
+        function loop() {
+          if (!rainActive) return;
+
+          spawnRandomButton();
+
+          const delay = 300 / rainSpeedMultiplier;
+          setTimeout(loop, delay);
+        }
+
+        loop();
+      }
+
+      // --- Events ---
+      skipButton.addEventListener('click', () => {
+        if (rainActive) return;
+        startChaosRain();
+        setTimeout(() => {
+          skipButton.style.display = 'none';
+        }, 100);
+      });
+
       window.addEventListener('message', (event) => {
         if (!event.data || !event.data.type) return;
 
         if (event.data.type === 'adStarted') {
-          // Show the skip button when the ad starts
           skipButton.style.display = 'block';
+          verificationBox.textContent = "(beta test) Ready to verify…";
         }
 
-        // By default, if the user doesn't "skip" the ad before the video ends,
-        // we call fail to restart. You're welcome to replace this with a survey
-        // or other interaction instead (see examples/survey).
         if (event.data.type === 'adFinished') {
+          stopRain();
           skipButton.style.display = 'none';
           window.top.postMessage({ type: 'fail' }, '*');
         }
       });
 
-      // Your ad overlay code goes here, we've added a simple example below:
-      skipButton.addEventListener('click', () => {
-        skipButton.style.display = 'none';
-        adSuccess();
-      });
-
-    })(window, document);
+    })();
   </script>
 </body>
+
 </html>
